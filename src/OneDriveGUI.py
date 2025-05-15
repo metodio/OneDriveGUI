@@ -56,15 +56,15 @@ from ui.ui_profile_settings_page import Ui_profile_settings
 from ui.ui_gui_settings_window import Ui_gui_settings_window
 
 # Import for login windows.
-# Don't use WebEngine login window when running from AppImage.
+from ui.ui_external_login import Ui_ExternalLoginWindow
+
+# try:
+#     from ui.ui_login import Ui_LoginWindow
+# except ImportError:
+#     logging.warning("Failed to import ui_login. This is expected if you are running AppImage version.")
+
+__version__ = "1.1.1"
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
-APPIMAGE = True if "mount_one" in DIR_PATH.lower() else False
-if APPIMAGE:
-    from ui.ui_external_login import Ui_ExternalLoginWindow
-else:
-    from ui.ui_login import Ui_LoginWindow
-
-
 PROFILES_FILE = os.path.expanduser("~/.config/onedrive-gui/profiles")
 GUI_SETTINGS_FILE = os.path.expanduser("~/.config/onedrive-gui/gui_settings")
 
@@ -72,7 +72,7 @@ GUI_SETTINGS_FILE = os.path.expanduser("~/.config/onedrive-gui/gui_settings")
 class SetupWizard(QWizard):
     def __init__(self, parent=None):
         super(SetupWizard, self).__init__(parent)
-        self.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-48.png"))
+        self.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-80-dark-edge.png"))
 
         self.setPage(1, WizardPage_welcome(self))
         self.setPage(2, wizardPage_version_check(self))
@@ -159,9 +159,14 @@ class wizardPage_version_check(QWizardPage):
         # Check if OneDrive is installed
         try:
             client_version_check = subprocess.check_output([client_bin_path, "--version"], stderr=subprocess.STDOUT)
-            installed_client_version = re.search(r".\s(v[0-9.]+)", str(client_version_check)).group(1)
+            installed_client_version = re.search(r"(v[0-9.]+)", str(client_version_check)).group(1)
             installed_client_version_num = int(installed_client_version.replace("v", "").replace(".", ""))
-            min_supported_version_num = 2415
+            installed_client_version_num = (
+                installed_client_version_num
+                if len(str(installed_client_version_num)) > 3
+                else installed_client_version_num * 10
+            )
+            min_supported_version_num = 2500
 
             if installed_client_version_num < min_supported_version_num:
                 logging.info(f"Unsupported OneDrive {installed_client_version} detected.")
@@ -346,10 +351,10 @@ class wizardPage_create_shared_library(QWizardPage):
 
     def get_sharepoint_site_list(self):
         """
-        Starts OneDrive with --get-O365-drive-id argument and populates comboBox list of SharePoint Sites emitted by MaintenanceWorker.
+        Starts OneDrive with --get-sharepoint-drive-id argument and populates comboBox list of SharePoint Sites emitted by MaintenanceWorker.
         """
         profile_name = self.comboBox_profile_list.currentText()
-        options = "--get-O365-drive-id 'non-existent-library'"
+        options = "--get-sharepoint-drive-id 'non-existent-library'"
 
         self.pushButton_get_sites.setDisabled(True)
         self.pushButton_get_sites.setText("Please wait...")
@@ -358,7 +363,9 @@ class wizardPage_create_shared_library(QWizardPage):
 
         self.obtain_sharepoint_site_list = MaintenanceWorker(profile_name, options)
         self.obtain_sharepoint_site_list.start()
-        self.obtain_sharepoint_site_list.update_sharepoint_site_list.connect(self.populate_comboBox_sharepoint_site_list)
+        self.obtain_sharepoint_site_list.update_sharepoint_site_list.connect(
+            self.populate_comboBox_sharepoint_site_list
+        )
 
     def populate_comboBox_sharepoint_site_list(self, sharepoint_site_list):
         """
@@ -386,14 +393,14 @@ class wizardPage_create_shared_library(QWizardPage):
 
     def get_library_drive_ids(self):
         """
-        Starts OneDrive with --get-O365-drive-id argument to obtain names and drive_ids
+        Starts OneDrive with --get-sharepoint-drive-id argument to obtain names and drive_ids
         of available SharePoint Shared Libraries within selected SharePoint Site.
 
         Once libraries are obtained, the worker emits dict {'Documents': 'b!SeGaP5QU4UWy...', 'test': 'b!SeGaP5QU4UWySy...'}
         """
         profile_name = self.comboBox_profile_list.currentText()
         library_name = self.comboBox_sharepoint_site_list.currentText()
-        options = f"--get-O365-drive-id '{library_name}'"
+        options = f"--get-sharepoint-drive-id '{library_name}'"
 
         self.pushButton_get_libraries.setText("Please wait...")
         self.pushButton_get_libraries.setDisabled(True)
@@ -446,10 +453,10 @@ class wizardPage_create_shared_library(QWizardPage):
         profile_settings_window.stop_unsaved_changes_timer()
 
         logging.info(f"[GUI] Available Libraries:  {self.library_dict}")
-        _site_name = self.comboBox_sharepoint_site_list.currentText().replace(" ", "_")
-        _library_name = self.comboBox_sharepoint_library_list.currentText().replace(" ", "_")
+        _site_name = self.comboBox_sharepoint_site_list.currentText()
+        _library_name = self.comboBox_sharepoint_library_list.currentText()
         _library_id = self.library_dict[_library_name]
-        profile_name = f"SharePoint_{_site_name}_{_library_name}"
+        profile_name = f'SharePoint_{_site_name.replace(" ", "_")}_{_library_name.replace(" ", "_")}'
 
         sync_dir = os.path.expanduser(f"~/{profile_name}")
         config_path = os.path.expanduser(f"~/.config/onedrive/accounts/{profile_name}/config")
@@ -875,7 +882,7 @@ class GuiSettingsWindow(QWidget, Ui_gui_settings_window):
         super(GuiSettingsWindow, self).__init__()
 
         self.setupUi(self)
-        self.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-48.png"))
+        self.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-80-dark-edge.png"))
 
         self.checkBox_start_minimized.setChecked(self.get_check_box_state("start_minimized"))
         self.checkBox_start_minimized.stateChanged.connect(self.set_check_box_state)
@@ -889,6 +896,9 @@ class GuiSettingsWindow(QWidget, Ui_gui_settings_window):
 
         self.checkBox_combined_start_stop_button.setChecked(self.get_check_box_state("combined_start_stop_button"))
         self.checkBox_combined_start_stop_button.stateChanged.connect(self.set_check_box_state)
+
+        self.checkBox_QWebEngine_login.setChecked(self.get_check_box_state("QWebEngine_login"))
+        self.checkBox_QWebEngine_login.stateChanged.connect(self.set_check_box_state)
 
         self.checkBox_show_debug.setChecked(self.get_check_box_state("show_debug"))
         self.checkBox_show_debug.stateChanged.connect(self.set_check_box_state)
@@ -1088,7 +1098,7 @@ class ProfileSettingsWindow(QWidget, Ui_profile_settings_window):
         self.unsaved_profiles = []
 
         self.setupUi(self)
-        self.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-48.png"))
+        self.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-80-dark-edge.png"))
         self.delegate = ListItemDelegate()
         self.listWidget_profiles.setItemDelegate(self.delegate)
 
@@ -1228,89 +1238,12 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
         self.pushButton_discard.clicked.connect(self.discard_changes)
         self.pushButton_save.clicked.connect(self.save_profile_settings)
         self.pushButton_save.clicked.connect(self.save_sync_list)
-        self.pushButton_save.clicked.connect(self.save_business_shared_folders)
 
         # Time which periodically checks for unsaved changes.
         self.timer_unsaved_changes = QTimer()
         self.timer_unsaved_changes.setSingleShot(False)
         self.timer_unsaved_changes.timeout.connect(self.check_for_unsaved_changes)
         self.timer_unsaved_changes.stop()
-
-    def get_business_shared_folders(self):
-        """
-        Starts OneDrive with --list-shared-folders argument and populates QListWidget list of SharePoint Sites emitted by MaintenanceWorker.
-        """
-        options = "--list-shared-folders"
-
-        self.listWidget_available_business_folders.clear()
-
-        self.pushButton_get_business_folders.setDisabled(True)
-        self.pushButton_get_business_folders.setText("Please wait...")
-
-        self.pushButton_add_business_folder.clicked.connect(self.add_business_shared_folder)
-
-        self.worker_business_shared_folders = MaintenanceWorker(self.profile, options)
-        self.worker_business_shared_folders.start()
-        self.worker_business_shared_folders.update_business_folder_list.connect(self.populate_listWidget_available_business_folders)
-
-    def read_business_shared_folders(self):
-        self.existing_shared_folders = []
-        self.business_shared_folders_file = re.search(r"(.+)/.+$", self.config_file).group(1) + "/business_shared_folders"
-
-        try:
-            with open(self.business_shared_folders_file, "r") as f:
-                self.raw_existing_shared_folders = f.read().splitlines(True)
-
-            for line in self.raw_existing_shared_folders:
-                if line.strip() == "":
-                    pass
-                elif line.strip()[0] == "#":
-                    pass
-                else:
-                    self.existing_shared_folders.append(line.strip())
-
-        except:
-            pass
-
-        # logging.info(f"[GUI] - Content of business_shared_folders_file: {self.existing_shared_folders}")
-        return self.existing_shared_folders
-
-    def save_business_shared_folders(self):
-        self.all_selected_business_folders = []
-        self.business_shared_folders_file = re.search(r"(.+)/.+$", self.config_file).group(1) + "/business_shared_folders"
-
-        for row in range(self.listWidget_selected_business_folders.count()):
-            self.all_selected_business_folders.append(self.listWidget_selected_business_folders.item(row).text())
-
-        with open(self.business_shared_folders_file, "w") as f:
-            for item in self.all_selected_business_folders:
-                f.writelines(item + "\n")
-
-    def add_business_shared_folder(self):
-        for available_selected_item in self.listWidget_available_business_folders.selectedItems():
-            if not self.listWidget_selected_business_folders.findItems(available_selected_item.text(), Qt.MatchExactly):
-                self.listWidget_selected_business_folders.addItem(available_selected_item.text())
-
-    def remove_business_shared_folder(self):
-        logging.info("[GUI] Removing list item")
-        for selected_item_index in self.listWidget_selected_business_folders.selectedItems():
-            self.listWidget_selected_business_folders.takeItem(self.listWidget_selected_business_folders.row(selected_item_index))
-
-    def populate_listWidget_available_business_folders(self, business_folder_list):
-        """
-        Populates listWidget_available_business_folders with a list of emitted Business Shared Folders.
-        """
-        if len(business_folder_list) == 0:
-            self.listWidget_available_business_folders.setDisabled(True)
-            self.pushButton_get_business_folders.setDisabled(False)
-            self.pushButton_get_business_folders.setText("Retry getting Business Shared Folders")
-
-        else:
-            self.listWidget_available_business_folders.addItems(sorted(business_folder_list, key=str.casefold))
-            self.listWidget_available_business_folders.setDisabled(False)
-
-            self.pushButton_get_business_folders.setText("Update Business Shared Folders")
-            self.pushButton_get_business_folders.setDisabled(False)
 
     def check_for_unsaved_changes(self):
         """
@@ -1321,7 +1254,6 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
 
         config_changed = False
         sync_list_changed = False
-        business_shared_folders_changed = False
         pixmap_warning = QPixmap(DIR_PATH + "/resources/images/warning.png").scaled(20, 20, Qt.KeepAspectRatio)
         unsaved_profile = profile_settings_window.listWidget_profiles.findItems(self.profile, Qt.MatchExactly)[0]
 
@@ -1341,21 +1273,8 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
             # No changes to OneDrive sync_list file detected.
             sync_list_changed = False
 
-        # Unsaved changes to business_shared_folders file?
-        existing_business_shared_folders = self.read_business_shared_folders()
-        new_business_shared_folders = []
-        for row in range(self.listWidget_selected_business_folders.count()):
-            new_business_shared_folders.append(self.listWidget_selected_business_folders.item(row).text())
-
-        if existing_business_shared_folders != new_business_shared_folders:
-            # Unsaved changes to OneDrive business_shared_folders file detected.
-            business_shared_folders_changed = True
-        else:
-            # No changes to OneDrive business_shared_folders file detected.
-            business_shared_folders_changed = False
-
         # Show warning if any configuration change was detected.
-        if any([config_changed, sync_list_changed, business_shared_folders_changed]):
+        if any([config_changed, sync_list_changed]):
             unsaved_profile.setIcon(pixmap_warning)
             unsaved_profile.setToolTip("This profile has unsaved configuration changes.")
 
@@ -1376,6 +1295,15 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
         self.lineEdit_sync_dir.textChanged.connect(self.set_sync_dir)
         self.checkBox_sync_root_files.stateChanged.connect(self.set_check_box_state)
         self.pushButton_sync_dir_browse.clicked.connect(self.get_sync_dir_name)
+        self.checkBox_sync_business_shared_items.stateChanged.connect(self.set_check_box_state)
+
+        # Disable Business Shared Folder tab when account type is not Business
+        if global_config[self.profile]["account_type"] == "Business":
+            self.checkBox_sync_business_shared_items.setEnabled(True)
+        elif global_config[self.profile]["onedrive"]["sync_business_shared_items"].strip('"') == "true":
+            self.checkBox_sync_business_shared_items.setEnabled(True)
+        else:
+            self.checkBox_sync_business_shared_items.setEnabled(False)
 
         # Skip_file section
         self.pushButton_add_skip_file.clicked.connect(self.add_skip_file)
@@ -1398,12 +1326,18 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
         self.spinBox_sync_dir_permissions.valueChanged.connect(self.set_spin_box_value)
         self.spinBox_sync_file_permissions.valueChanged.connect(self.set_spin_box_value)
         self.spinBox_operation_timeout.valueChanged.connect(self.set_spin_box_value)
+        self.spinBox_connect_timeout.valueChanged.connect(self.set_spin_box_value)
+        self.spinBox_data_timeout.valueChanged.connect(self.set_spin_box_value)
+        self.spinBox_ip_protocol_version.valueChanged.connect(self.set_spin_box_value)
+        self.spinBox_threads.valueChanged.connect(self.set_spin_box_value)
         self.checkBox_download_only.stateChanged.connect(self.set_check_box_state)
         self.checkBox_download_only.stateChanged.connect(self.validate_checkbox_input)
         self.checkBox_upload_only.stateChanged.connect(self.set_check_box_state)
         self.checkBox_upload_only.stateChanged.connect(self.validate_checkbox_input)
         self.checkBox_force_http_11.stateChanged.connect(self.set_check_box_state)
         self.checkBox_disable_upload_validation.stateChanged.connect(self.set_check_box_state)
+        self.checkBox_disable_download_validation.stateChanged.connect(self.set_check_box_state)
+        self.checkBox_display_running_config.stateChanged.connect(self.set_check_box_state)
         self.checkBox_check_nomount.stateChanged.connect(self.set_check_box_state)
         self.checkBox_local_first.stateChanged.connect(self.set_check_box_state)
         self.checkBox_no_remote_delete.stateChanged.connect(self.set_check_box_state)
@@ -1420,7 +1354,9 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
         self.spinBox_rate_limit.valueChanged.connect(self.set_spin_box_value)
         self.spinBox_rate_limit.valueChanged.connect(self.horizontalSlider_rate_limit.setValue)
         self.spinBox_rate_limit.valueChanged.connect(
-            lambda: self.label_rate_limit_mbps.setText(str(round(self.spinBox_rate_limit.value() * 8 / 1000 / 1000, 2)) + " Mbit/s")
+            lambda: self.label_rate_limit_mbps.setText(
+                str(round(self.spinBox_rate_limit.value() * 8 / 1000 / 1000, 2)) + " Mbit/s"
+            )
         )
         self.horizontalSlider_rate_limit.valueChanged.connect(self.spinBox_rate_limit.setValue)
 
@@ -1442,18 +1378,11 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
         self.spinBox_monitor_log_frequency.valueChanged.connect(self.set_spin_box_value)
         self.checkBox_disable_notifications.stateChanged.connect(self.set_check_box_state)
         self.checkBox_disable_notifications.stateChanged.connect(self.validate_checkbox_input)
-        self.spinBox_min_notify_changes.valueChanged.connect(self.set_spin_box_value)
 
         # Account tab
         self.pushButton_login.clicked.connect(lambda: main_window.show_login(self.profile))
         self.pushButton_logout.clicked.connect(self.logout)
         self.checkBox_auto_sync.stateChanged.connect(self.set_check_box_state_profile)
-
-        # Business Shared Folders
-        self.checkBox_sync_business_shared_folders.stateChanged.connect(self.set_check_box_state)
-        self.groupBox_sync_business_shared_folders.clicked.connect(self.set_check_box_state)
-        self.pushButton_get_business_folders.clicked.connect(self.get_business_shared_folders)
-        self.pushButton_remove_business_folders.clicked.connect(self.remove_business_shared_folder)
 
     def configure_profile_settings_page(self):
         """Sets all widgets values with values from profile config files"""
@@ -1461,6 +1390,7 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
         # Monitored files tab
         self.lineEdit_sync_dir.setText(self.temp_profile_config["onedrive"]["sync_dir"].strip('"'))
         self.checkBox_sync_root_files.setChecked(self.get_check_box_state("sync_root_files"))
+        self.checkBox_sync_business_shared_items.setChecked(self.get_check_box_state("sync_business_shared_items"))
 
         # Excluded files tab
 
@@ -1481,22 +1411,36 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
         self.checkBox_skip_dotfiles.setChecked(self.get_check_box_state("skip_dotfiles"))
 
         # Sync Options tab
-        if client_version < 2420:
-            self.checkBox_force_http_11.setEnabled(False)
-        else:
-            self.checkBox_force_http_11.setChecked(self.get_check_box_state("force_http_11"))
-
+        self.checkBox_force_http_11.setChecked(self.get_check_box_state("force_http_11"))
         self.spinBox_monitor_interval.setValue(int(self.temp_profile_config["onedrive"]["monitor_interval"].strip('"')))
-        self.spinBox_monitor_fullscan_frequency.setValue(int(self.temp_profile_config["onedrive"]["monitor_fullscan_frequency"].strip('"')))
-        self.spinBox_classify_as_big_delete.setValue(int(self.temp_profile_config["onedrive"]["classify_as_big_delete"].strip('"')))
-        self.spinBox_sync_dir_permissions.setValue(int(self.temp_profile_config["onedrive"]["sync_dir_permissions"].strip('"')))
-        self.spinBox_sync_file_permissions.setValue(int(self.temp_profile_config["onedrive"]["sync_file_permissions"].strip('"')))
-        self.spinBox_operation_timeout.setValue(int(self.temp_profile_config["onedrive"]["operation_timeout"].strip('"')))
+        self.spinBox_monitor_fullscan_frequency.setValue(
+            int(self.temp_profile_config["onedrive"]["monitor_fullscan_frequency"].strip('"'))
+        )
+        self.spinBox_classify_as_big_delete.setValue(
+            int(self.temp_profile_config["onedrive"]["classify_as_big_delete"].strip('"'))
+        )
+        self.spinBox_sync_dir_permissions.setValue(
+            int(self.temp_profile_config["onedrive"]["sync_dir_permissions"].strip('"'))
+        )
+        self.spinBox_sync_file_permissions.setValue(
+            int(self.temp_profile_config["onedrive"]["sync_file_permissions"].strip('"'))
+        )
+        self.spinBox_operation_timeout.setValue(
+            int(self.temp_profile_config["onedrive"]["operation_timeout"].strip('"'))
+        )
+        self.spinBox_connect_timeout.setValue(int(self.temp_profile_config["onedrive"]["connect_timeout"].strip('"')))
+        self.spinBox_data_timeout.setValue(int(self.temp_profile_config["onedrive"]["data_timeout"].strip('"')))
+        self.spinBox_ip_protocol_version.setValue(
+            int(self.temp_profile_config["onedrive"]["ip_protocol_version"].strip('"'))
+        )
+        self.spinBox_threads.setValue(int(self.temp_profile_config["onedrive"]["threads"].strip('"')))
         self.checkBox_download_only.setChecked(self.get_check_box_state("download_only"))
         self.checkBox_download_only.setDisabled(self.get_check_box_state("upload_only"))
         self.checkBox_upload_only.setChecked(self.get_check_box_state("upload_only"))
         self.checkBox_upload_only.setDisabled(self.get_check_box_state("download_only"))
         self.checkBox_disable_upload_validation.setChecked(self.get_check_box_state("disable_upload_validation"))
+        self.checkBox_disable_download_validation.setChecked(self.get_check_box_state("disable_download_validation"))
+        self.checkBox_display_running_config.setChecked(self.get_check_box_state("display_running_config"))
         self.checkBox_check_nomount.setChecked(self.get_check_box_state("check_nomount"))
         self.checkBox_local_first.setChecked(self.get_check_box_state("local_first"))
         self.checkBox_no_remote_delete.setChecked(self.get_check_box_state("no_remote_delete"))
@@ -1517,15 +1461,23 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
 
         # Webhooks tab
         self.checkBox_webhook_enabled.setChecked(self.get_check_box_state("webhook_enabled"))
-        self.spinBox_webhook_expiration_interval.setValue(int(self.temp_profile_config["onedrive"]["webhook_expiration_interval"].strip('"')))
+        self.spinBox_webhook_expiration_interval.setValue(
+            int(self.temp_profile_config["onedrive"]["webhook_expiration_interval"].strip('"'))
+        )
         self.spinBox_webhook_expiration_interval.setEnabled(self.checkBox_webhook_enabled.isChecked())
-        self.spinBox_webhook_renewal_interval.setValue(int(self.temp_profile_config["onedrive"]["webhook_renewal_interval"].strip('"')))
+        self.spinBox_webhook_renewal_interval.setValue(
+            int(self.temp_profile_config["onedrive"]["webhook_renewal_interval"].strip('"'))
+        )
         self.spinBox_webhook_renewal_interval.setEnabled(self.checkBox_webhook_enabled.isChecked())
-        self.spinBox_webhook_listening_port.setValue(int(self.temp_profile_config["onedrive"]["webhook_listening_port"].strip('"')))
+        self.spinBox_webhook_listening_port.setValue(
+            int(self.temp_profile_config["onedrive"]["webhook_listening_port"].strip('"'))
+        )
         self.spinBox_webhook_listening_port.setEnabled(self.checkBox_webhook_enabled.isChecked())
         self.lineEdit_webhook_public_url.setText(self.temp_profile_config["onedrive"]["webhook_public_url"].strip('"'))
         self.lineEdit_webhook_public_url.setEnabled(self.checkBox_webhook_enabled.isChecked())
-        self.lineEdit_webhook_listening_host.setText(self.temp_profile_config["onedrive"]["webhook_listening_host"].strip('"'))
+        self.lineEdit_webhook_listening_host.setText(
+            self.temp_profile_config["onedrive"]["webhook_listening_host"].strip('"')
+        )
         self.lineEdit_webhook_listening_host.setEnabled(self.checkBox_webhook_enabled.isChecked())
 
         # Logging tab
@@ -1534,12 +1486,11 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
         self.lineEdit_log_dir.setEnabled(self.checkBox_enable_logging.isChecked())
         self.pushButton_log_dir_browse.setEnabled(self.checkBox_enable_logging.isChecked())
         self.checkBox_debug_https.setChecked(self.get_check_box_state("debug_https"))
-        self.checkBox_debug_https.setEnabled(self.checkBox_enable_logging.isChecked())
-        self.spinBox_monitor_log_frequency.setValue(int(self.temp_profile_config["onedrive"]["monitor_log_frequency"].strip('"')))
+        self.spinBox_monitor_log_frequency.setValue(
+            int(self.temp_profile_config["onedrive"]["monitor_log_frequency"].strip('"'))
+        )
         self.spinBox_monitor_log_frequency.setEnabled(self.checkBox_enable_logging.isChecked())
         self.checkBox_disable_notifications.setChecked(self.get_check_box_state("disable_notifications"))
-        self.spinBox_min_notify_changes.setValue(int(self.temp_profile_config["onedrive"]["min_notify_changes"].strip('"')))
-        self.spinBox_min_notify_changes.setEnabled(self.checkBox_disable_notifications.isChecked())
 
         # Account tab
         self.config_file = global_config[self.profile]["config_file"].strip('"')
@@ -1549,30 +1500,6 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
 
         # Sync List tab
         self.textEdit_sync_list.setText(self.read_sync_list())
-
-        # Business Shared Folders
-        self.existing_business_shared_folders = self.read_business_shared_folders()
-
-        self.checkBox_sync_business_shared_folders.setChecked(self.get_check_box_state("sync_business_shared_folders"))
-        self.checkBox_sync_business_shared_folders.hide()
-        self.groupBox_sync_business_shared_folders.setChecked(self.get_check_box_state("sync_business_shared_folders"))
-        self.listWidget_available_business_folders.setDisabled(True)
-        self.listWidget_available_business_folders.clear()
-        self.listWidget_available_business_folders.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.listWidget_selected_business_folders.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.listWidget_selected_business_folders.clear()
-        self.listWidget_selected_business_folders.addItems(self.existing_business_shared_folders)
-
-        # Disable Business Shared Folder tab when account type is not Business
-        # TODO: This should be a separate method. We only need to run this check on startup and when new account is created.
-        # TODO: Since we do not know the account type when the profile is created, the tab will be disabled by default.
-        # TODO: We also keep the tab enabled when imported profile has sync_business_shared_folders set to True.
-        if global_config[self.profile]["account_type"] == "Business":
-            self.tabWidget.setTabEnabled(4, True)
-        elif global_config[self.profile]["onedrive"]["sync_business_shared_folders"].strip('"') == "true":
-            self.tabWidget.setTabEnabled(4, True)
-        else:
-            self.tabWidget.setTabEnabled(4, False)
 
     def read_sync_list(self):
         self.sync_list_file = re.search(r"(.+)/.+$", self.config_file).group(1) + "/sync_list"
@@ -1614,19 +1541,11 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
             if self.checkBox_enable_logging.isChecked():
                 self.lineEdit_log_dir.setEnabled(True)
                 self.spinBox_monitor_log_frequency.setEnabled(True)
-                self.checkBox_debug_https.setEnabled(True)
                 self.pushButton_log_dir_browse.setEnabled(True)
             else:
                 self.lineEdit_log_dir.setEnabled(False)
                 self.spinBox_monitor_log_frequency.setEnabled(False)
-                self.checkBox_debug_https.setEnabled(False)
                 self.pushButton_log_dir_browse.setEnabled(False)
-
-        if self.sender().objectName() == "checkBox_disable_notifications":
-            if self.checkBox_disable_notifications.isChecked():
-                self.spinBox_min_notify_changes.setEnabled(True)
-            else:
-                self.spinBox_min_notify_changes.setEnabled(False)
 
         if self.sender().objectName() == "checkBox_webhook_enabled":
             if self.checkBox_webhook_enabled.isChecked():
@@ -1642,9 +1561,6 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
                 self.lineEdit_webhook_public_url.setEnabled(False)
                 self.lineEdit_webhook_listening_host.setEnabled(False)
 
-        # if self.sender().objectName() == "checkBox_sync_business_shared_folders":
-        #     if self.checkBox_sync_business_shared_folders.isChecked():
-
     def str2bool(self, value):
         return value.lower() in "true"
 
@@ -1655,7 +1571,9 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
         main_window.profile_status_pages[self.profile].stop_monitor()
         if self.profile in main_window.workers:
             main_window.workers[self.profile].stop_worker()
-            main_window.profile_status_pages[self.profile].label_onedrive_status.setText("OneDrive sync has been stopped")
+            main_window.profile_status_pages[self.profile].label_onedrive_status.setText(
+                "OneDrive sync has been stopped"
+            )
             logging.info(f"OneDrive sync for profile {self.profile} has been stopped.")
         else:
             logging.info(f"OneDrive for profile {self.profile} is not running.")
@@ -1737,7 +1655,9 @@ class ProfileSettingsPage(QWidget, Ui_profile_settings):
 
     def set_rate_limit(self):
         self.temp_profile_config["onedrive"]["rate_limit"] = f'"{self.lineEdit_rate_limit.text()}"'
-        self.label_rate_limit_mbps.setText(str(round(int(self.lineEdit_rate_limit.text()) * 8 / 1000 / 1000, 2)) + " Mbit/s")
+        self.label_rate_limit_mbps.setText(
+            str(round(int(self.lineEdit_rate_limit.text()) * 8 / 1000 / 1000, 2)) + " Mbit/s"
+        )
 
     def set_sync_dir(self):
         self.temp_profile_config["onedrive"]["sync_dir"] = f'"{self.lineEdit_sync_dir.text()}"'
@@ -1832,7 +1752,7 @@ class MaintenanceWorker(QThread):
         logging.debug(f"[GUI] OneDrive config file: {self.config_file}")
         logging.debug(f"[GUI] OneDrive config dir: {self.config_dir}")
 
-        self._command = f"exec {client_bin_path} --confdir='{self.config_dir}' -v {options}"
+        self._command = f"exec {client_bin_path} --confdir='{self.config_dir}' {options}"
         logging.debug(f"[GUI] Maintenance command: '{self._command}'")
 
     def run(self):
@@ -1863,7 +1783,7 @@ class MaintenanceWorker(QThread):
             logging.info(f"[GUI] - Login response: {self.login_response}")
             self.update_login_response.emit({"profile_name": self.profile, "response": self.login_response})
 
-        elif "--get-O365-drive-id 'non-existent-library'" in self.options:
+        elif "--get-sharepoint-drive-id 'non-existent-library'" in self.options:
             # Trying to obtain Sharepoint Site list by searching a non-existent library name.
             logging.info(f"[GUI] Trying to get list of SharePoint Sites...")
             self.sharepoint_site_list = []
@@ -1881,7 +1801,7 @@ class MaintenanceWorker(QThread):
             logging.info(f"[GUI] - Number of retrieved Shared libraries: {len(self.sharepoint_site_list)}")
             self.update_sharepoint_site_list.emit(self.sharepoint_site_list)
 
-        elif "--get-O365-drive-id '" in self.options:
+        elif "--get-sharepoint-drive-id '" in self.options:
             self.library_ids_dict = {}
 
             # Obtain Drive ID of a specific Shared Library.
@@ -1899,7 +1819,7 @@ class MaintenanceWorker(QThread):
 
             self.update_library_list.emit(self.library_ids_dict)
 
-        elif "--list-shared-folders" in self.options:
+        elif "--list-shared-items" in self.options:
             self.business_folder_list = []
 
             while self.onedrive_maintainer.poll() is None:
@@ -2018,6 +1938,7 @@ class WorkerThread(QThread):
     update_progress_new = Signal(dict, str)
     update_profile_status = Signal(dict, str)
     trigger_resync = Signal(str)
+    trigger_big_delete = Signal(str)
 
     def __init__(self, profile, options=""):
         super(WorkerThread, self).__init__()
@@ -2068,22 +1989,23 @@ class WorkerThread(QThread):
             "account_type": "",
         }
 
+        self.profile_status["status_message"] = "OneDrive sync is starting..."
+        self.update_profile_status.emit(self.profile_status, self.profile_name)
+
         self.onedrive_process = subprocess.Popen(
             self._command + "--resync" if resync else self._command,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             shell=True,
             universal_newlines=True,
+            encoding="utf-8",
+            errors="replace",
         )
 
         while self.onedrive_process.poll() is None:
             if self.onedrive_process.stdout:
-                # Capture stdout from OneDrive process.
+                # Capture stdout and stderr from OneDrive process.
                 self.read_stdout()
-
-            elif self.onedrive_process.stderr:
-                # Capture stderr from OneDrive process.
-                self.read_stderr()
 
         # This helps monitor stdout and stderr for extra second after onedrive process stops. I could not find a smarter way.
         timeout = time.time() + 1
@@ -2103,19 +2025,23 @@ class WorkerThread(QThread):
                 self.profile_status["status_message"] = "Cannot connect to Microsoft OneDrive Service"
                 self.update_profile_status.emit(self.profile_status, self.profile_name)
 
-            if "Authorize this app visiting" in stdout:
+            elif "Authorise this application by" in stdout or "--reauth and re-authorise this client" in stdout:
                 self.onedrive_process.kill()
                 self.profile_status["status_message"] = "OneDrive login is required"
                 self.update_profile_status.emit(self.profile_status, self.profile_name)
                 self.update_credentials.emit(self.profile_name)
 
-            elif "Sync with OneDrive is complete" in stdout:
+            elif "Sync with Microsoft OneDrive is complete" in stdout:
                 self.profile_status["status_message"] = "OneDrive sync is complete"
+                self.update_profile_status.emit(self.profile_status, self.profile_name)
+
+            elif "Sync with Microsoft OneDrive has completed, however there are items that failed to sync" in stdout:
+                self.profile_status["status_message"] = "Sync completed with errors. Check the log file."
                 self.update_profile_status.emit(self.profile_status, self.profile_name)
 
             elif "Remaining Free Space" in stdout:
                 try:
-                    self.free_space_bytes = re.search(r"([0-9]+)", stdout).group(1)
+                    self.free_space_bytes = re.search(r"([0-9]+)\sbytes", stdout).group(1)
                     self.free_space_human = str(humanize_file_size(int(self.free_space_bytes)))
                 except:
                     self.free_space_human = "Not Available"
@@ -2152,17 +2078,29 @@ class WorkerThread(QThread):
                     self.profile_status["status_message"] = "OneDrive is processing items..."
                 self.update_profile_status.emit(self.profile_status, self.profile_name)
 
+            elif "--resync is required" in stdout:
+                # Ask user for resync authorization and stop the worker.
+                logging.warning(f"[{self.profile_name}] {str(stdout)}  - Asking for resync authorization.")
+                self.trigger_resync.emit(self.profile_name)
+
+            elif "To delete a large volume of data use" in stdout:
+                # Ask user for big delete authorization and stop the worker.
+                logging.warning(f"[{self.profile_name}] {str(stdout)}  - Asking for big delete authorization.")
+                self.update_profile_status.emit(self.profile_status, self.profile_name)
+                self.profile_status["status_message"] = "Sync stopped due to big delete detected."
+                self.trigger_big_delete.emit(self.profile_name)
+
             elif any(_ in stdout for _ in self.tasks):
                 # Capture information about file that is being uploaded/downloaded/deleted by OneDrive.
                 file_operation = re.search(r"\b([Uploading|Downloading|Deleting]+)*", stdout).group(1)
 
                 if file_operation == "Deleting":
                     self.file_name = re.search(r".*/(.+)$", stdout)
-                    self.file_path = re.search(r"\b[item|OneDrive:]+\s(.+)$", stdout)
+                    self.file_path = re.search(r"\b[item|OneDrive:]\s(.+)$", stdout)
 
                 else:
                     self.file_name = re.search(r".*/(.+)\s+\.+", stdout)
-                    self.file_path = re.search(r"\b[file]+\s(.+)\s+\.\.\.", stdout)
+                    self.file_path = re.search(r"\b[file:]+\s(.+)\s+\.\.\.", stdout)
 
                 transfer_complete = any(["done" in stdout, "Deleting" in stdout])
                 progress = "0"
@@ -2185,69 +2123,82 @@ class WorkerThread(QThread):
                 else:
                     self.profile_status["status_message"] = "OneDrive sync in progress..."
 
-            elif "% |" in stdout:
-                # Capture upload/download progress status
+            elif "% " in stdout:
+                # Capture download progress status
+                """
+                # Line Example for regex:
+                # Uploading: dir1/another dir 2 - 123/dir3/50MBa.zip ... 80%  |  ETA    00:00:04
+                """
+                match = re.search(r"(\w[Downloading|Uploading]+)\:\s+(.+?)[\.]*\s(\d{1,3})\%", stdout)
+                if match:
+                    file_operation = match.group(1)
+                    file_path = match.group(2).strip()
+                    progress = match.group(3)
 
-                file_operation = re.search(r"\b([Uploading|Downloading]+)*", stdout).group(1)
-                progress = re.search(r"\s([0-9]+)%", stdout).group(1)
-                transfer_complete = progress == "100"
+                    if progress != "100":
+                        transfer_complete = progress == "100"
 
-                transfer_progress_new = {
-                    "file_operation": file_operation,
-                    "file_path": "unknown file name" if self.file_path is None else self.file_path.group(1),
-                    "progress": progress,
-                    "transfer_complete": transfer_complete,
-                }
+                        transfer_progress_new = {
+                            "file_operation": file_operation,
+                            "file_path": file_path,
+                            "progress": progress,
+                            "transfer_complete": transfer_complete,
+                        }
 
-                logging.info(transfer_progress_new)
-                self.update_progress_new.emit(transfer_progress_new, self.profile_name)
+                        logging.info(transfer_progress_new)
+                        self.update_progress_new.emit(transfer_progress_new, self.profile_name)
 
-                if transfer_complete:
-                    pass
-                    # self.profile_status["status_message"] = "OneDrive sync is complete"
-                else:
-                    self.profile_status["status_message"] = "OneDrive sync in progress..."
+                        if transfer_complete:
+                            pass
+                            # self.profile_status["status_message"] = "OneDrive sync is complete"
+                        else:
+                            self.profile_status["status_message"] = "OneDrive sync in progress..."
 
+                        self.update_profile_status.emit(self.profile_status, self.profile_name)
+                    elif progress == "100":
+                        # Ignore progress 100% message to prevent duplicate entries.
+                        # It will always be followed by another confirmation.
+                        # Example: "Downloading file ./200MB.zip ... done"
+                        pass
+
+            elif "sync_business_shared_folders" in stdout:
+                self.profile_status["status_message"] = (
+                    "Business Shared Folder "
+                    '<a href="https://github.com/abraunegg/onedrive/blob/master/docs/business-shared-items.md"> has been deprecated</a>.'
+                )
                 self.update_profile_status.emit(self.profile_status, self.profile_name)
 
-            else:
-                # logging.debug(f"No rule matched: {stdout}")
-                pass
+            elif "Network Connection Issue" in stdout:
+                self.profile_status["status_message"] = "Cannot connect to Microsoft OneDrive Service."
+                self.update_profile_status.emit(self.profile_status, self.profile_name)
 
-    def read_stderr(self):
-        stderr = self.onedrive_process.stderr.readline().strip()
+            elif "onedrive application is already running" in stdout:
+                self.profile_status["status_message"] = "OneDrive is already running outside OneDriveGUI !"
+                self.update_profile_status.emit(self.profile_status, self.profile_name)
 
-        if stderr != "":
-            logging.error(f"[{self.profile_name}] {str(stderr)}")
-
-            if "not found" in stderr:
-                logging.info(
+            elif "command not found" in stdout:
+                logging.error(
                     """Onedrive does not seem to be installed. Please install it as per instruction at 
                 https://github.com/abraunegg/onedrive/blob/master/docs/INSTALL.md """
                 )
 
-                self.profile_status[
-                    "status_message"
-                ] = 'OneDrive Client not found! Please <a href="https://github.com/abraunegg/onedrive/blob/master/docs/INSTALL.md" style="color:#FFFFFF;">install</a> it.'
+                self.profile_status["status_message"] = (
+                    'OneDrive Client not found! Please <a href="https://github.com/abraunegg/onedrive/blob/master/docs/INSTALL.md" style="color:#FFFFFF;">install</a> it.'
+                )
                 self.update_profile_status.emit(self.profile_status, self.profile_name)
 
-            elif "--resync is required" in stderr:
-                # Ask user for resync authorization and stop the worker.
-                logging.error(f"[{self.profile_name}] {str(stderr)}  - Asking for resync authorization.")
-                self.trigger_resync.emit(self.profile_name)
-
-            elif "onedrive application is already running" in stderr:
-                self.profile_status["status_message"] = "OneDrive is already running outside OneDriveGUI !"
+            elif "/dlang/" in stdout:
+                self.profile_status["status_message"] = "OneDrive client crashed. Please check logs."
                 self.update_profile_status.emit(self.profile_status, self.profile_name)
 
-            elif "Network Connection Issue" in stderr:
-                self.profile_status["status_message"] = "Cannot connect to Microsoft OneDrive Service."
-                self.update_profile_status.emit(self.profile_status, self.profile_name)
-
-            elif "refresh_token" in stderr:
+            elif "refresh_token" in stdout:
                 self.profile_status["status_message"] = "Logon details expired. Please re-authenticate."
                 self.update_profile_status.emit(self.profile_status, self.profile_name)
                 self.update_credentials.emit(self.profile_name)
+
+            else:
+                # logging.debug(f"No rule matched: {stdout}")
+                pass
 
 
 class AlignDelegate(QStyledItemDelegate):
@@ -2262,7 +2213,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         super(MainWindow, self).__init__()
         self.setupUi(self)
-        self.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-48.png"))
+        self.setWindowTitle(f"OneDriveGUI v{__version__}")
+        self.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-80-dark-edge.png"))
 
         if gui_settings["SETTINGS"]["frameless_window"] == "True":
             self.setWindowFlags(Qt.FramelessWindowHint)
@@ -2455,44 +2407,67 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         s = requests.Session()
         version_label_text = ""
         version_tooltip_text = ""
+        min_requirements_met = True
+        min_supported_version = 2500
+
+        def get_latest_client_version():
+            latest_url = "https://api.github.com/repos/abraunegg/onedrive/releases/latest"
+            try:
+                latest_client_version = s.get(latest_url, timeout=1).json()["tag_name"]
+                return latest_client_version
+
+            except Exception as e:
+                logging.error(e)
+                return None
+
+        def get_installed_client_version():
+            try:
+                client_version_check = subprocess.check_output([client_bin_path, "--version"], stderr=subprocess.STDOUT)
+                installed_client_version = re.search(r"(v[0-9.]+)", str(client_version_check)).group(1)
+
+                installed_client_version_num = int(installed_client_version.replace("v", "").replace(".", ""))
+                installed_client_version_num = (
+                    installed_client_version_num
+                    if len(str(installed_client_version_num)) > 3
+                    else installed_client_version_num * 10
+                )
+
+                return installed_client_version, installed_client_version_num
+
+            except Exception as e:
+                logging.error(e)
+                return None
 
         try:
-            latest_url = "https://api.github.com/repos/abraunegg/onedrive/releases/latest"
-            latest_client_version = s.get(latest_url, timeout=1).json()["tag_name"]
-            client_version_check = subprocess.check_output([client_bin_path, "--version"], stderr=subprocess.STDOUT)
-            installed_client_version = re.search(r".\s(v[0-9.]+)", str(client_version_check)).group(1)
-            installed_client_version_num = int(installed_client_version.replace("v", "").replace(".", ""))
-            min_supported_version_num = 2415
-            min_requirements_met = True
+            latest_client_version = get_latest_client_version()
+            installed_client_version = get_installed_client_version()
 
-            result = {
-                "latest_client_version": latest_client_version,
-                "installed_client_version": installed_client_version,
-            }
-            logging.debug(f"[GUI] Client version check: {result}")
+            logging.debug(
+                f"[GUI] Client version check: Installed: {installed_client_version[0]} | Latest: {latest_client_version}"
+            )
 
-            if latest_client_version not in installed_client_version:
-                version_label_text = "OneDrive client is out of date!"
-                version_tooltip_text = f"OneDrive client is out of date! \n Installed: {installed_client_version} \n Latest: {latest_client_version}"
-
-            if installed_client_version_num < min_supported_version_num:
-                version_label_text = 'Unsupported OneDrive client! Please <a href="https://github.com/abraunegg/onedrive/blob/master/docs/INSTALL.md" style="color:#FFFFFF;">upgrade</a> it.'
-                version_tooltip_text = f"OneDrive Client version not supported! Please upgrade it. \n Installed: {installed_client_version} \n Latest: {latest_client_version}"
+            if not installed_client_version:
+                version_label_text = "OneDrive client not found!"
+                version_tooltip_text = "OneDrive client not found!"
                 min_requirements_met = False
 
-        except FileNotFoundError as e:
-            logging.error(f"OneDrive Client not found: {e}")
-            version_label_text = 'OneDrive Client not found! Please <a href="https://github.com/abraunegg/onedrive/blob/master/docs/INSTALL.md" style="color:#FFFFFF;">install</a> it.'
-            version_tooltip_text = f"OneDrive Client not found! Please install it."
-            min_requirements_met = False
+            elif not latest_client_version:
+                version_label_text = "Unable to check for latest OneDrive client version!"
+                version_tooltip_text = "Unable to check for latest OneDrive client version!"
 
-        except Exception as e:
-            logging.error(f"Client version check failed: {e}")
+            elif installed_client_version[1] < min_supported_version:
+                version_label_text = 'Unsupported OneDrive client! Please <a href="https://github.com/abraunegg/onedrive/blob/master/docs/INSTALL.md" style="color:#FFFFFF;">upgrade</a> it.'
+                version_tooltip_text = f"Your OneDrive Client version not supported! Please upgrade it. \n Installed: {installed_client_version[0]} \n Latest: {latest_client_version}"
+                min_requirements_met = False
 
-        finally:
+            elif latest_client_version not in installed_client_version[0]:
+                version_label_text = "OneDrive client is out of date!"
+                version_tooltip_text = f"OneDrive client is out of date! \n Installed: {installed_client_version[0]} \n Latest: {latest_client_version}"
+
             for profile_name in global_config:
                 self.profile_status_pages[profile_name].label_onedrive_status.setOpenExternalLinks(True)
-                if version_label_text != "":
+
+                if version_label_text:
                     self.profile_status_pages[profile_name].label_onedrive_status.setText(version_label_text)
 
                 if not min_requirements_met:
@@ -2508,10 +2483,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     self.profile_status_pages[profile_name].label_version_check.setToolTip(version_tooltip_text)
                     self.profile_status_pages[profile_name].label_version_check.setPixmap(pixmap_warning)
 
+        except Exception as e:
+            logging.error(f"Client version check failed: {e}")
+
     def onedrive_process_status(self):
         # Check OneDrive status and start/stop sync button.
-        pixmap_running = QPixmap(DIR_PATH + "/resources/images/icons8-green-circle-48.png").scaled(24, 24, Qt.KeepAspectRatio)
-        pixmap_stopped = QPixmap(DIR_PATH + "/resources/images/icons8-red-circle-48.png").scaled(24, 24, Qt.KeepAspectRatio)
+        pixmap_running = QPixmap(DIR_PATH + "/resources/images/icons8-green-circle-48.png").scaled(
+            24, 24, Qt.KeepAspectRatio
+        )
+        pixmap_stopped = QPixmap(DIR_PATH + "/resources/images/icons8-red-circle-48.png").scaled(
+            24, 24, Qt.KeepAspectRatio
+        )
 
         for profile_name in global_config:
             profile_status_page = self.profile_status_pages[profile_name]
@@ -2542,10 +2524,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def autostart_monitor(self):
         # Auto-start sync if compatible version of OneDrive client is installed.
         for profile_name in global_config:
-            logging.debug(f"[{profile_name}] Compatible client version found: {self.profile_status_pages[profile_name].pushButton_start.isEnabled()}")
+            logging.debug(
+                f"[{profile_name}] Compatible client version found: {self.profile_status_pages[profile_name].pushButton_start.isEnabled()}"
+            )
             logging.debug(f"[{profile_name}] Auto-sync enabled for profile: {global_config[profile_name]['auto_sync']}")
 
-            if self.profile_status_pages[profile_name].pushButton_start.isEnabled() and global_config[profile_name]["auto_sync"] == "True":
+            if (
+                self.profile_status_pages[profile_name].pushButton_start.isEnabled()
+                and global_config[profile_name]["auto_sync"] == "True"
+            ):
                 self.start_onedrive_monitor(profile_name)
 
     def start_onedrive_monitor(self, profile_name, options=""):
@@ -2556,7 +2543,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             logging.info(f"Worker for profile {profile_name} is already running. Please stop it first.")
             logging.info(f"Running workers: {main_window.workers}")
 
-        if APPIMAGE:
+        if "True" not in gui_settings["SETTINGS"]["QWebEngine_login"]:
             # Assume GUI runs as AppImage. Force login in external browser as a workaround for #37 .
             logging.info(f"[GUI] Opening external login window")
             self.workers[profile_name].update_credentials.connect(self.show_external_login)
@@ -2566,11 +2553,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.workers[profile_name].update_credentials.connect(self.show_login)
 
         self.workers[profile_name].trigger_resync.connect(self.resync_auth_dialog)
-        self.workers[profile_name].update_progress_new.connect(self.event_update_progress_new)
+        self.workers[profile_name].trigger_big_delete.connect(self.big_delete_auth_dialog)
+        self.workers[profile_name].update_progress_new.connect(self.event_update_progress)
         self.workers[profile_name].update_profile_status.connect(self.event_update_profile_status)
         self.workers[profile_name].started.connect(lambda: logging.info(f"started worker {profile_name}"))
         self.workers[profile_name].finished.connect(lambda: logging.info(f"finished worker {profile_name}"))
-        self.workers[profile_name].finished.connect(lambda: main_window.workers[profile_name].stop_worker())
+        try:
+            self.workers[profile_name].finished.connect(lambda: main_window.workers[profile_name].stop_worker())
+        except KeyError:
+            logging.debug(f"[GUI] The worker for profile {profile_name} is already stopped.")
 
     def resync_auth_dialog(self, profile_name):
         resync_question = QMessageBox.question(
@@ -2594,12 +2585,35 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             logging.info("Authorize sync: No")
             main_window.profile_status_pages[profile_name].stop_monitor()
 
+    def big_delete_auth_dialog(self, profile_name):
+        big_delete_question = QMessageBox.question(
+            self,
+            f"Big Delete detected for profile {profile_name}",
+            "An attempt to remove a large volume of data from OneDrive has been detected. <br><br>"
+            "This has the potential to delete a large volume of data from your OneDrive which can lead to <b>data loss</b>. <br><br>"
+            "If in-doubt, backup your OneDrive data first before proceeding with big delete.<br><br><br>"
+            f"Would you like to proceed with big delete for profile <b>{profile_name}</b>?",
+            buttons=QMessageBox.Yes | QMessageBox.No,
+            defaultButton=QMessageBox.No,
+        )
+
+        if big_delete_question == QMessageBox.Yes:
+            logging.info("Authorize big delete: Yes")
+            main_window.profile_status_pages[profile_name].stop_monitor()
+            self.start_onedrive_monitor(profile_name, "--force")
+            self.profile_status_pages[profile_name].label_onedrive_status.setText("Big delete approved")
+
+        elif big_delete_question == QMessageBox.No:
+            logging.info("Authorize big delete: No")
+            main_window.profile_status_pages[profile_name].stop_monitor()
+            self.profile_status_pages[profile_name].label_onedrive_status.setText("Big delete denied")
+
     def event_update_profile_status(self, data, profile):
         self.profile_status_pages[profile].label_onedrive_status.setText(data["status_message"])
         self.profile_status_pages[profile].label_free_space.setText(data["free_space"])
         self.profile_status_pages[profile].label_account_type.setText(data["account_type"])
 
-    def event_update_progress_new(self, data, profile):
+    def event_update_progress(self, data, profile):
         """
         data:
         transfer_progress = {
@@ -2616,85 +2630,122 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         absolute_path = QFileInfo(file_path).absolutePath().replace(" ", "%20")
         relative_path_display = os.path.relpath(QFileInfo(file_path).absolutePath(), _sync_dir + os.path.sep)
         parent_dir = re.search(r".+/([^/]+)/.+$", file_path).group(1)
-        file_size = QFileInfo(file_path + ".partial").size() if QFileInfo(file_path).size() == 0 else QFileInfo(file_path).size()
+        file_size = (
+            QFileInfo(file_path + ".partial").size()
+            if QFileInfo(file_path).size() == 0
+            else QFileInfo(file_path).size()
+        )
         file_size_human = humanize_file_size(file_size)
         file_name = QFileInfo(file_path).fileName()
-        file_path2 = QFileInfo(file_path).filePath()
         progress = data["progress"]
         progress_data = file_size / 100 * int(progress)
         progress_data_human = humanize_file_size(progress_data)
         file_operation = data["file_operation"]
         transfer_complete = data["transfer_complete"]
         move_scrollbar = True
+        new_list_item = True
 
-        logging.info("absolute path " + absolute_path)
-        logging.info("relative path " + relative_path_display)
+        for row in range(50):
+            # Check last 50 entries to see if the file is already in the list.
+            if self.profile_status_pages[profile].listWidget.item(row) != None:
+                item = self.profile_status_pages[profile].listWidget.item(row)
+                item_widget = self.profile_status_pages[profile].listWidget.itemWidget(item)
+                item_file_name = item_widget.get_file_name()
+                item_incomplete = item_widget.ls_progressBar.isVisible()
 
-        logging.info("parent dir " + parent_dir)
-        logging.info("progress: " + progress)
-        logging.info("progress data: " + humanize_file_size(progress_data))
-        logging.info("file path: " + file_path)
-        logging.info("file size: " + humanize_file_size(file_size))
-        logging.info("file name: " + file_name)
-        logging.info("file path2: " + file_path2)
+                if file_name == item_file_name and item_incomplete:
+                    # If current file is already in the list and progress bar is not complete, update the existing item.
+                    # Otherwise skip and create a new item.
+                    logging.info("Updating list item")
 
-        # Delete last item list if it has the same file name.
-        if self.profile_status_pages[profile].listWidget.item(0) != None:
-            last_item = self.profile_status_pages[profile].listWidget.item(0)
-            last_item_widget = self.profile_status_pages[profile].listWidget.itemWidget(last_item)
-            last_file_name = last_item_widget.get_file_name()
-            logging.info(f"The last list item's file name is : {last_file_name}")
+                    item_widget.set_progress(int(progress))
+                    # item_widget.set_icon(file_path)
+                    item_widget.hide_progress_bar(transfer_complete)
 
-            if file_name == last_file_name:
-                move_scrollbar = False
-                logging.info("Deleting last list item")
-                self.profile_status_pages[profile].listWidget.takeItem(0)
+                    if file_operation == "Deleting":
+                        item_widget.set_label_1(f"Deleted from {parent_dir}")
+                        item_widget.set_label_2(f"")
 
-        myQCustomQWidget = TaskList()
-        myQCustomQWidget.set_file_name(file_name)
-        myQCustomQWidget.set_progress(int(progress))
-        myQCustomQWidget.set_icon(file_path)
-        myQCustomQWidget.hide_progress_bar(transfer_complete)
+                    elif transfer_complete and file_operation == "Uploading":
+                        shortened_path = shorten_path(relative_path_display, 32)
+                        item_widget.set_label_1(f"Uploaded from <a href=file:///{absolute_path}>{shortened_path}</a>")
+                        item_widget.set_label_2(f"{file_size_human}")
 
-        if file_operation == "Deleting":
-            myQCustomQWidget.set_label_1(f"Deleted from {parent_dir}")
-            myQCustomQWidget.set_label_2(f"")
+                    elif transfer_complete and file_operation == "Downloading":
+                        shortened_path = shorten_path(relative_path_display, 32)
+                        item_widget.set_label_1(f"Downloaded from <a href=file:///{absolute_path}>{shortened_path}</a>")
+                        item_widget.set_label_2(f"{file_size_human}")
 
-        elif transfer_complete:
-            shortened_path = shorten_path(relative_path_display, 32)
-            myQCustomQWidget.set_label_1(f"Available in <a href=file:///{absolute_path}>{shortened_path}</a>")
-            myQCustomQWidget.set_label_2(f"{file_size_human}")
+                    elif file_operation == "Downloading":
+                        # Estimate final size of file before download completes
+                        # Adding 5% to progress as the OD client report status 5% behind.
+                        item_widget.set_label_1(file_operation)
+                        item_widget.set_label_2(
+                            f"{humanize_file_size(file_size)} of ~{humanize_file_size(int(file_size) / (int(progress) + 5) * 100)}"
+                        )
+                    else:
+                        item_widget.set_label_1(file_operation)
+                        item_widget.set_label_2(f"{progress_data_human} of {file_size_human}")
 
-        elif file_operation == "Downloading":
-            # Estimate final size of file before download completes
-            # Adding 5% to progress as the OD client report status 5% behind.
-            myQCustomQWidget.set_label_1(file_operation)
-            myQCustomQWidget.set_label_2(f"{humanize_file_size(file_size)} of ~{humanize_file_size(int(file_size) / (int(progress) + 5) * 100)}")
-        else:
-            myQCustomQWidget.set_label_1(file_operation)
-            myQCustomQWidget.set_label_2(f"{progress_data_human} of {file_size_human}")
+                    self.profile_status_pages[profile].listWidget.setItemWidget(item, item_widget)
+                    new_list_item = False
+                    logging.info(f"List item updated for file {item_file_name}")
+                    break
 
-        # Create QListWidgetItem
-        myQListWidgetItem = QListWidgetItem()
+        if new_list_item:
+            logging.info(f"Adding new list item for file {file_name}")
+            myQCustomQWidget = TaskList()
+            myQCustomQWidget.set_file_name(file_name)
+            myQCustomQWidget.set_progress(int(progress))
+            myQCustomQWidget.set_icon(file_path)
+            myQCustomQWidget.hide_progress_bar(transfer_complete)
 
-        # Set size hint
-        myQListWidgetItem.setSizeHint(myQCustomQWidget.sizeHint())
+            if file_operation == "Deleting":
+                myQCustomQWidget.set_label_1(f"Deleted from {parent_dir}")
+                myQCustomQWidget.set_label_2(f"")
 
-        # Add QListWidgetItem into QListWidget
-        listWidget = self.profile_status_pages[profile].listWidget
-        listWidget.insertItem(0, myQListWidgetItem)
-        listWidget.setItemWidget(myQListWidgetItem, myQCustomQWidget)
+            elif transfer_complete and file_operation == "Uploading":
+                shortened_path = shorten_path(relative_path_display, 32)
+                myQCustomQWidget.set_label_1(f"Uploaded from <a href=file:///{absolute_path}>{shortened_path}</a>")
+                myQCustomQWidget.set_label_2(f"{file_size_human}")
 
-        # If the list is not scrolled all the way to the top, increment the scroll value so that the list stays in the same spot when new items are added.
-        scroll = listWidget.verticalScrollBar()
-        currentScrollValue = scroll.value()
-        if move_scrollbar and (currentScrollValue > 0):
-            scroll.setValue(currentScrollValue + 1)
+            elif transfer_complete and file_operation == "Downloading":
+                shortened_path = shorten_path(relative_path_display, 32)
+                myQCustomQWidget.set_label_1(f"Downloaded from <a href=file:///{absolute_path}>{shortened_path}</a>")
+                myQCustomQWidget.set_label_2(f"{file_size_human}")
+
+            elif file_operation == "Downloading":
+                # Estimate final size of file before download completes
+                # Adding 5% to progress as the OD client report status 5% behind.
+                myQCustomQWidget.set_label_1(file_operation)
+                myQCustomQWidget.set_label_2(
+                    f"{humanize_file_size(file_size)} of ~{humanize_file_size(int(file_size) / (int(progress) + 5) * 100)}"
+                )
+            else:
+                myQCustomQWidget.set_label_1(file_operation)
+                myQCustomQWidget.set_label_2(f"{progress_data_human} of {file_size_human}")
+
+            # Create QListWidgetItem
+            myQListWidgetItem = QListWidgetItem()
+
+            # Set size hint
+            myQListWidgetItem.setSizeHint(myQCustomQWidget.sizeHint())
+
+            # Add QListWidgetItem into QListWidget
+            listWidget = self.profile_status_pages[profile].listWidget
+            listWidget.insertItem(0, myQListWidgetItem)
+            listWidget.setItemWidget(myQListWidgetItem, myQCustomQWidget)
+
+            # If the list is not scrolled all the way to the top, increment the scroll value so that the list stays in the same spot when new items are added.
+            scroll = listWidget.verticalScrollBar()
+            currentScrollValue = scroll.value()
+            if move_scrollbar and (currentScrollValue > 0):
+                scroll.setValue(currentScrollValue + 1)
 
     def show_login(self, profile):
         # Show login window with QT WebEngine
         self.window1 = QWidget()
-        self.window1.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-48.png"))
+        self.window1.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-80-dark-edge.png"))
         self.lw = Ui_LoginWindow()
         self.lw.setupUi(self.window1)
         self.window1.show()
@@ -2713,12 +2764,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.lw.loginFrame.setUrl(QUrl(url))
 
         # Wait for user to login and obtain response URL
-        self.lw.loginFrame.urlChanged.connect(lambda: self.get_response_url(self.lw.loginFrame.url().toString(), profile))
+        self.lw.loginFrame.urlChanged.connect(
+            lambda: self.get_response_url(self.lw.loginFrame.url().toString(), profile)
+        )
 
     def show_external_login(self, profile):
         # Show external login window
         self.window2 = QWidget()
-        self.window2.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-48.png"))
+        self.window2.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-80-dark-edge.png"))
         self.lw2 = Ui_ExternalLoginWindow()
         self.lw2.setupUi(self.window2)
         self.window2.show()
@@ -2732,7 +2785,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.lw2.lineEdit_response_url.textChanged.connect(self.enable_login_button)
 
-        self.lw2.pushButton_login.clicked.connect(lambda: self.get_response_url(self.lw2.lineEdit_response_url.text(), profile))
+        self.lw2.pushButton_login.clicked.connect(
+            lambda: self.get_response_url(self.lw2.lineEdit_response_url.text(), profile)
+        )
 
     def enable_login_button(self):
         # Enable 'Save' button only when valid URL with login response code is provided.
@@ -2760,7 +2815,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         response_reason = response["response"]
 
         if response_reason == "success":
-            main_window.profile_status_pages[profile_name].label_onedrive_status.setText("Login successful. Please, start sync manually.")
+            main_window.profile_status_pages[profile_name].label_onedrive_status.setText(
+                "Login successful. Please, start sync manually."
+            )
 
             response_dialog = QMessageBox.information(
                 self,
@@ -2783,7 +2840,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if response_dialog == QMessageBox.Ok:
             logging.info("[GUI] Login response message acknowledged.")
 
-            if APPIMAGE and response_reason == "success":
+            if "True " not in gui_settings["SETTINGS"]["QWebEngine_login"] and response_reason == "success":
                 self.window2.hide()
             elif response_reason == "success":
                 self.window1.hide()
@@ -2849,6 +2906,7 @@ def get_installed_client_version() -> int:
         installed_client_version = re.search(r".\s(v[0-9.]+)", str(client_version_check)).group(1)
         installed_client_version_num = int(installed_client_version.replace("v", "").replace(".", ""))
     except:
+        logging.error(f"[GUI] Onedrive client not found!")
         installed_client_version_num = 0
 
     logging.debug(f"[GUI] Installed client version is {installed_client_version_num}")
@@ -2916,26 +2974,15 @@ def create_global_config():
 
         profiles[profile]["onedrive"].update(od_config["onedrive"])
 
-        # this option is not supported since OneDrive v2.4.20 - #42
-        # TODO: Remove after some time...
-        if client_version >= 2420 and "force_http_2" in profiles[profile]["onedrive"]:
-            logging.debug("[GUI] - replacing obsolete option 'force_http_2' with 'force_http_11'")
-            profiles[profile]["onedrive"].pop("force_http_2")
-            profiles[profile]["onedrive"]["force_http_11"] = '"false"'
-
-        # Support bad boys with outdated version of OneDrive Client
-        # TODO: Remove after some time...
-        if client_version < 2420 and "force_http_11" in profiles[profile]["onedrive"]:
-            logging.debug("[GUI] - replacing option 'force_http_11' with 'force_http_2'")
-            profiles[profile]["onedrive"].pop("force_http_11")
-            profiles[profile]["onedrive"]["force_http_2"] = '"false"'
-
     logging.debug(f"[GUI]{profiles}")
     return profiles
 
 
 def save_global_config():
     # Save all OneDrive config files after configuration change.
+
+    # Load all default values. Needed for to remove all default/empty values from the config before it is saved on disk.
+    _default_od_config = read_config(DIR_PATH + "/resources/default_config")
 
     # Save GUI profile file changes
     _profile_config = copy.deepcopy(global_config)
@@ -2977,6 +3024,16 @@ def save_global_config():
 
         od_config = ConfigParser()
         od_config.read_dict(_od_config)
+
+        # Remove keys with default values from config before it is saved on disk. OneDrive client can't start when config contains default/empty key values.
+        for section in od_config.sections():
+            if section in _default_od_config:
+                for option in od_config[section]:
+                    if (
+                        option in _default_od_config[section]
+                        and od_config[section][option] == _default_od_config[section][option]
+                    ):
+                        od_config.remove_option(section, option)
 
         # Backup last config
         os.system(f"cp {od_config_file} {od_config_file}_backup")
@@ -3032,6 +3089,7 @@ def read_gui_settings():
             "log_file": "/tmp/onedrive-gui/onedrive-gui.log",
             "debug_level": "DEBUG",
             "client_bin_path": "onedrive",
+            "QWebEngine_login": "False",
         }
     }
 
@@ -3173,6 +3231,8 @@ if __name__ == "__main__":
         level=config_debug_level(),
     )
 
+    logging.info(f"Starting OneDriveGUI v{__version__}")
+
     client_bin_path = config_client_bin_path()
     client_version = get_installed_client_version()
     global_config = create_global_config()
@@ -3184,7 +3244,7 @@ if __name__ == "__main__":
 
     app = QApplication(sys.argv)
     app.setApplicationName("OneDriveGUI")
-    app.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-48.png"))
+    app.setWindowIcon(QIcon(DIR_PATH + "/resources/images/icons8-clouds-80-dark-edge.png"))
 
     main_window = MainWindow()
     main_window_start_state()

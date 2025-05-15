@@ -1,9 +1,29 @@
+> [!WARNING]
+> OneDriveGUI v1.1.0 is only compatible with [OneDrive client v2.5.0](https://github.com/abraunegg/onedrive) . 
+> There is no backward compatibility with older OneDrive client versions. Please use [OneDriveGUI v1.0.3](https://github.com/bpozdena/OneDriveGUI/releases/tag/v1.0.3) for OneDrive client v2.4.x . 
+
+> [!IMPORTANT]
+> If you are using `sync_business_shared_folders` in of OneDrive v2.4.0, you will need to manually remove it from the config file. Check the [client documentation](https://github.com/abraunegg/onedrive/blob/onedrive-v2.5.0-release-candidate-1/docs/business-shared-items.md) for more details. 
+
+> [!NOTE]
+> If your OneDrive client v2.5 is not installed system wide, you can manually define the path to the OneDrive binary in the GUI settings.  
+
+Example:
+
+![image](https://github.com/bpozdena/OneDriveGUI/assets/24818591/9595886f-850a-4f6a-a1b4-e0bd872eb5cc)
+
+
+
+
+
 # OneDriveGUI
 ![GitHub all releases](https://img.shields.io/github/downloads/bpozdena/OneDriveGUI/total)
 
-A simple GUI for [Linux OneDrive Client](https://github.com/abraunegg/onedrive), with multi-account support.
+## About
+A simple GUI for [Linux OneDrive Client](https://github.com/abraunegg/onedrive) with multi-account support.
+![image](https://github.com/user-attachments/assets/00769399-1a65-4648-8705-7dee81ee4f52)
 
-![GUI_git](https://user-images.githubusercontent.com/24818591/187522951-bcfb05c6-8f8c-46ff-a213-80dce8f0d87a.png)
+
 
 
 ## Feature highlights  
@@ -15,19 +35,20 @@ A simple GUI for [Linux OneDrive Client](https://github.com/abraunegg/onedrive),
 - System tray (if supported by your desktop environment)
 - Start minimized to tray/dock 
 - Input validation to prevent configuration of incompatible OneDrive client options
-- Import and management of Business Shared Folders
+- Progress monitoring of multiple simultaneous file transfers. 
 - Import and management of SharePoint Shared Libraries
-- ToolTips with brief explanation of various OneDrive Client configuration options.
+- Tooltips with brief explanation of various OneDrive Client configuration options.
 - Prompt for re-sync authorization to prevent unexpected data loss. 
 
 
 ## Known Limitations
 - No window shadows for Wayland sessions
+- No window icon when using AppImage on Wayland session
 - AppImage still requires the use of external browser for authentication
 - Check for other reported [issues/limitations](https://github.com/bpozdena/OneDriveGUI/issues). 
 
 ## Compatibility
-- Minimum supported OneDrive client v2.4.15
+- Minimum supported OneDrive client v2.5.0
 - You will be shown warnings when your OneDrive Client is not up to date.
 
 
@@ -85,7 +106,7 @@ A simple GUI for [Linux OneDrive Client](https://github.com/abraunegg/onedrive),
 
 
 # Additional Notes
-- When importing OneDrive config file, all comments will be removed. Missing options will be replaced with [default values](src/resources/default_config).
+- When importing OneDrive config file, all comments will be removed.
 - If multi-line options 'skip_file' and 'skip_dir' are used, they will be consolidated into a single line.
 - List of managed OneDrive profiles is stored in `~/.config/onedrive-gui/profiles`. You can manually rename your profile or path to config file there.
 - Newly created OneDrive config files are stored in `~/.config/onedrive/accounts/<profile_name>`

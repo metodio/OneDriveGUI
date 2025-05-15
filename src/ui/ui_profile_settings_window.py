@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'profile_settings_window.ui'
+## Form generated from reading UI file 'profile_settings_windowsinRqy.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.2.3
+## Created by: Qt User Interface Compiler version 6.7.2
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -23,7 +23,7 @@ class Ui_profile_settings_window(object):
     def setupUi(self, profile_settings_window):
         if not profile_settings_window.objectName():
             profile_settings_window.setObjectName(u"profile_settings_window")
-        profile_settings_window.resize(322, 800)
+        profile_settings_window.resize(1272, 851)
         self.verticalLayout_2 = QVBoxLayout(profile_settings_window)
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
         self.horizontalLayout = QHBoxLayout()
@@ -47,6 +47,11 @@ class Ui_profile_settings_window(object):
         self.pushButton_remove.setObjectName(u"pushButton_remove")
 
         self.verticalLayout.addWidget(self.pushButton_remove)
+
+        self.pushButton_rename = QPushButton(profile_settings_window)
+        self.pushButton_rename.setObjectName(u"pushButton_rename")
+
+        self.verticalLayout.addWidget(self.pushButton_rename)
 
         self.pushButton_create_import = QPushButton(profile_settings_window)
         self.pushButton_create_import.setObjectName(u"pushButton_create_import")
@@ -72,6 +77,7 @@ class Ui_profile_settings_window(object):
         self.pushButton_remove.setToolTip(QCoreApplication.translate("profile_settings_window", u"<html><head/><body><p>Removes selected profile from OneDriveGUI only.</p><p>The OneDrive client config files and synced files will remain untouched and can be re-imported again.</p></body></html>", None))
 #endif // QT_CONFIG(tooltip)
         self.pushButton_remove.setText(QCoreApplication.translate("profile_settings_window", u"Remove profile", None))
+        self.pushButton_rename.setText(QCoreApplication.translate("profile_settings_window", u"Rename profile", None))
 #if QT_CONFIG(tooltip)
         self.pushButton_create_import.setToolTip(QCoreApplication.translate("profile_settings_window", u"Opens wizard which allows creation of new profiles or import of existing ones.", None))
 #endif // QT_CONFIG(tooltip)

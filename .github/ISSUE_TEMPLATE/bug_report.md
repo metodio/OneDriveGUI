@@ -1,47 +1,41 @@
 ---
 name: Bug report
 about: Create a report to help us improve
-title: ''
+title: "[BUG]"
 labels: ''
-assignees: ''
+assignees: bpozdena
 
 ---
 
 **Describe the bug**
-A clear and concise description of what the bug is.
+...issue description...
 
 **To Reproduce**
 Steps to reproduce the behavior:
+1. Open OneDriveGUI by ...
+2. ...
+3. ...
+...
 
 **Expected behavior**
-A clear and concise description of what you expected to happen.
+...description of expected behavior...
 
 **Screenshots**
-If applicable, add screenshots to help explain your problem.
+Provide a screenshot of the GUI showing the issue.
 
 **Log**
 If applicable, add relevant output from log file `/tmp/onedrive-gui/onedrive-gui.log`.
-
-**System Info**
- - Linux distribution: [e.g. Ubuntu 22.04]
- - Desktop environment:  [e.g. Gnome]
- - Compositor: [e.g. Wayland]
- - Python version: [e.g. 3.11]
- - Version of OneDrive client [e.g. v2.4.25]
-
-or output of below commands:
-```sh
-lsb_release -a
-echo $XDG_CURRENT_DESKTOP
-loginctl show-session $(awk '/tty/ {print $1}' <(loginctl)) -p Type | awk -F= '{print $2}'
-python --version
-onedrive --version
+```
+...
 ```
 
+**System Info**
+ - Linux distribution: [e.g. Arch Linux]
+ - Desktop environment:  [e.g. KDE Plasma 6.1.4]
+ - Compositor: [Wayland/X11]
+ - Python version: [e.g. 3.12.3]
+ - Version of OneDrive client: [e.g. 2.5.0]
+
 **OneDriveGUI info**
-How did you install OneDriveGUI?: [AppImage/source/AUR]
-What is the name of the AppImage file (if applicable)? : [e.g OneDriveGUI-1.x.x-x86_64.AppImage]
-
-
-**Additional context**
-Add any other context about the problem here.
+How did you install OneDriveGUI?: [e.g. AppImage, AUR(package name), etc.]
+What is the name of the AppImage file (if applicable)? : [e.g.  OneDriveGUI-1.1.0-x86_64.AppImage ]
